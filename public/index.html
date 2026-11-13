@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wavy — 2-Player Wavelength</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --bullseye: #ef4444;
+      --mid: #f59e0b;
+      --outer: #10b981;
+    }
+
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .container {
+      background: var(--card);
+      width: 100%;
+      max-width: 600px;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 2rem; letter-spacing: -0.5px; }
+    p.subtitle { color: var(--muted); margin-top: 0; margin-bottom: 24px; }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: white;
+      font-size: 1rem;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    input:focus { border-color: var(--accent); }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: transform 0.1s, background 0.2s;
+    }
+    button:hover { background: var(--accent-hover); color: white; }
+    button:active { transform: scale(0.98); }
+    button.secondary { background: #334155; color: white; margin-top: 8px; }
+    button.secondary:hover { background: #475569; }
+
+    .divider {
+      margin: 18px 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .hidden { display: none !important; }
+
+    .scoreboard {
+      display: flex;
+      justify-content: space-between;
+      background: #0f172a;
+      padding: 12px 18px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+    }
+
+    /* Spectrum Cards */
+    .spectrum-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .spectrum-side {
+      flex: 1;
+      padding: 14px 10px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    .left-side { background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; }
+    .right-side { background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #7dd3fc; }
+
+    /* SVG Dial */
+    .dial-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      margin: 0 auto 16px;
+      user-select: none;
+    }
+    svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 10px;
+      border-radius: 5px;
+      background: #334155;
+      outline: none;
+      margin: 10px 0 20px;
+      padding: 0;
+      border: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+    }
+
+    .clue-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      padding: 14px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fde047;
+    }
+
+    .room-code-display {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: 6px;
+      color: var(--accent);
+      background: #0f172a;
+      padding: 16px;
+      border-radius: 12px;
+      margin: 16px 0;
+    }
+
+    .error-banner {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="errorBox" class="error-banner hidden"></div>
+
+    <!-- LOBBY VIEW -->
+    <div id="lobbyView">
+      <h1>🌊 Wavy</h1>
+      <p class="subtitle">Read each other's minds across the spectrum.</p>
+      <input type="text" id="playerName" placeholder="Enter your name" maxlength="16" />
+      <button id="createBtn">Create New Room</button>
+      <div class="divider">or join a friend</div>
+      <input type="text" id="roomCodeInput" placeholder="4-Letter Room Code" maxlength="4" style="text-transform: uppercase;" />
+      <button id="joinBtn" class="secondary">Join Room</button>
+    </div>
+
+    <!-- WAITING ROOM VIEW -->
+    <div id="waitingView" class="hidden">
+      <h1>Waiting for Player 2...</h1>
+      <p class="subtitle">Share this room code with your friend:</p>
+      <div class="room-code-display" id="displayRoomCode">----</div>
+      <p style="color: var(--muted); font-size: 0.9rem;">The game will start automatically when they join.</p>
+    </div>
+
+    <!-- GAME VIEW -->
+    <div id="gameView" class="hidden">
+      <div class="scoreboard">
+        <span id="p1Score">Player 1: 0</span>
+        <span style="color: var(--muted);" id="roundDisplay">Round 1</span>
+        <span id="p2Score">Player 2: 0</span>
+      </div>
+
+      <div class="badge" id="roleBadge">Your Role</div>
+
+      <div class="spectrum-bar">
+        <div class="spectrum-side left-side" id="leftLabel">Left</div>
+        <div class="spectrum-side right-side" id="rightLabel">Right</div>
+      </div>
+
+      <!-- DIAL SVG -->
+      <div class="dial-wrapper">
+        <svg viewBox="0 0 400 220" id="dialSvg">
+          <!-- Base semi-circle -->
+          <path d="M 20 200 A 180 180 0 0 1 380 200 Z" fill="#0f172a" stroke="#334155" stroke-width="3" />
+          
+          <!-- Target Zones Group (Hidden when Guesser is guessing) -->
+          <g id="targetWedges"></g>
+
+          <!-- Cover Shield (Shown when Guesser is guessing) -->
+          <path id="shieldCover" d="M 20 200 A 180 180 0 0 1 380 200 Z" fill="#1e293b" stroke="#475569" stroke-width="3" class="hidden" />
+          <text id="shieldText" x="200" y="135" fill="#64748b" font-size="16" font-weight="bold" text-anchor="middle" class="hidden">TARGET HIDDEN</text>
+
+          <!-- Needle -->
+          <g id="needleGroup" transform="rotate(0, 200, 200)">
+            <line x1="200" y1="200" x2="200" y2="30" stroke="#ef4444" stroke-width="5" stroke-linecap="round" />
+            <circle cx="200" cy="200" r="14" fill="#f8fafc" />
+            <circle cx="200" cy="200" r="6" fill="#ef4444" />
+          </g>
+        </svg>
+      </div>
+
+      <!-- PHASE CONTROLS -->
+      <!-- 1. Psychic Clue Input -->
+      <div id="psychicClueControls" class="hidden">
+        <p style="color: var(--muted); margin-bottom: 10px;">Give a 1–2 word clue that matches where the target is on the spectrum:</p>
+        <input type="text" id="clueInput" placeholder="Type your clue..." maxlength="40" />
+        <button id="submitClueBtn">Lock In Clue</button>
+      </div>
+
+      <!-- 2. Guesser Waiting for Clue -->
+      <div id="guesserWaitClue" class="hidden">
+        <p style="color: var(--muted); font-size: 1.1rem;">Psychic is thinking of a clue...</p>
+      </div>
+
+      <!-- 3. Active Clue Display + Guesser Slider -->
+      <div id="clueDisplayArea" class="hidden">
+        <div class="clue-box" id="activeClueText">"Clue"</div>
+        
+        <div id="guesserSliderControls" class="hidden">
+          <input type="range" id="dialSlider" min="0" max="100" value="50" />
+          <button id="lockGuessBtn">Lock In Guess</button>
+        </div>
+
+        <div id="psychicWaitGuess" class="hidden">
+          <p style="color: var(--muted);">Watch your partner move the dial in real time!</p>
+        </div>
+      </div>
+
+      <!-- 4. Reveal & Next Round -->
+      <div id="revealControls" class="hidden">
+        <h2 id="pointsResult" style="margin: 8px 0; color: #4ade80;">+4 Points! Bullseye!</h2>
+        <button id="nextRoundBtn">Next Round</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let currentState = null;
+
+    // DOM Elements
+    const errorBox = document.getElementById('errorBox');
+    const lobbyView = document.getElementById('lobbyView');
+    const waitingView = document.getElementById('waitingView');
+    const gameView = document.getElementById('gameView');
+
+    const dialSlider = document.getElementById('dialSlider');
+    const needleGroup = document.getElementById('needleGroup');
+    const targetWedges = document.getElementById('targetWedges');
+    const shieldCover = document.getElementById('shieldCover');
+    const shieldText = document.getElementById('shieldText');
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.classList.remove('hidden');
+    }
+
+    // Lobby Events
+    document.getElementById('createBtn').onclick = () => {
+      const name = document.getElementById('playerName').value.trim() || 'Player 1';
+      socket.emit('createRoom', name);
+    };
+
+    document.getElementById('joinBtn').onclick = () => {
+      const name = document.getElementById('playerName').value.trim() || 'Player 2';
+      const code = document.getElementById('roomCodeInput').value.trim();
+      if (!code) return showError('Please enter a 4-letter room code.');
+      socket.emit('joinRoom', { code, playerName: name });
+    };
+
+    socket.on('roomCreated', (code) => {
+      document.getElementById('displayRoomCode').textContent = code;
+      lobbyView.classList.add('hidden');
+      waitingView.classList.remove('hidden');
+    });
+
+    socket.on('errorMsg', (msg) => showError(msg));
+
+    // Geometry helper for SVG wedges (0 to 100 maps to -90deg to +90deg)
+    function valToAngle(val) {
+      return (val - 50) * 1.8; // -90 to +90
+    }
+
+    function createWedgePath(centerVal, widthVal) {
+      const startVal = Math.max(0, centerVal - widthVal);
+      const endVal = Math.min(100, centerVal + widthVal);
+      const startRad = ((startVal / 100) * Math.PI) - Math.PI;
+      const endRad = ((endVal / 100) * Math.PI) - Math.PI;
+
+      const r = 178;
+      const cx = 200, cy = 200;
+      const x1 = cx + r * Math.cos(startRad);
+      const y1 = cy + r * Math.sin(startRad);
+      const x2 = cx + r * Math.cos(endRad);
+      const y2 = cy + r * Math.sin(endRad);
+
+      return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`;
+    }
+
+    function renderTarget(targetVal) {
+      if (targetVal === null || targetVal === undefined) {
+        targetWedges.innerHTML = '';
+        shieldCover.classList.remove('hidden');
+        shieldText.classList.remove('hidden');
+        return;
+      }
+
+      shieldCover.classList.add('hidden');
+      shieldText.classList.add('hidden');
+
+      targetWedges.innerHTML = `
+        <path d="${createWedgePath(targetVal, 16)}" fill="#10b981" opacity="0.85" />
+        <path d="${createWedgePath(targetVal, 10)}" fill="#f59e0b" opacity="0.95" />
+        <path d="${createWedgePath(targetVal, 4)}" fill="#ef4444" />
+      `;
+    }
+
+    function setNeedle(val) {
+      const deg = valToAngle(val);
+      needleGroup.setAttribute('transform', `rotate(${deg}, 200, 200)`);
+    }
+
+    // Dial Slider Movement
+    dialSlider.oninput = (e) => {
+      const val = e.target.value;
+      setNeedle(val);
+      socket.emit('updateDial', val);
+    };
+
+    socket.on('dialMoved', (val) => {
+      setNeedle(val);
+    });
+
+    // Game Actions
+    document.getElementById('submitClueBtn').onclick = () => {
+      const clue = document.getElementById('clueInput').value.trim();
+      if (!clue) return;
+      socket.emit('submitClue', clue);
+      document.getElementById('clueInput').value = '';
+    };
+
+    document.getElementById('lockGuessBtn').onclick = () => {
+      socket.emit('lockGuess', dialSlider.value);
+    };
+
+    document.getElementById('nextRoundBtn').onclick = () => {
+      socket.emit('nextRound');
+    };
+
+    // Main State Sync
+    socket.on('gameState', (state) => {
+      currentState = state;
+      if (state.phase === 'WAITING') return;
+
+      errorBox.classList.add('hidden');
+      lobbyView.classList.add('hidden');
+      waitingView.classList.add('hidden');
+      gameView.classList.remove('hidden');
+
+      // Scoreboard & Labels
+      document.getElementById('p1Score').textContent = `${state.players[0].name}: ${state.players[0].score}`;
+      document.getElementById('p2Score').textContent = `${state.players[1].name}: ${state.players[1].score}`;
+      document.getElementById('roundDisplay').textContent = `Round ${state.round}`;
+      document.getElementById('leftLabel').textContent = state.spectrum[0];
+      document.getElementById('rightLabel').textContent = state.spectrum[1];
+
+      const roleBadge = document.getElementById('roleBadge');
+      roleBadge.textContent = state.isPsychic ? '🔮 You are the Psychic' : '🎯 You are the Guesser';
+
+      // Target & Needle
+      renderTarget(state.target);
+      setNeedle(state.guess);
+      dialSlider.value = state.guess;
+
+      // Reset Phase Panels
+      ['psychicClueControls', 'guesserWaitClue', 'clueDisplayArea', 'guesserSliderControls', 'psychicWaitGuess', 'revealControls']
+        .forEach(id => document.getElementById(id).classList.add('hidden'));
+
+      if (state.phase === 'CLUE') {
+        if (state.isPsychic) {
+          document.getElementById('psychicClueControls').classList.remove('hidden');
+        } else {
+          document.getElementById('guesserWaitClue').classList.remove('hidden');
+        }
+      } else if (state.phase === 'GUESS') {
+        document.getElementById('clueDisplayArea').classList.remove('hidden');
+        document.getElementById('activeClueText').textContent = `"${state.clue}"`;
+
+        if (state.isPsychic) {
+          document.getElementById('psychicWaitGuess').classList.remove('hidden');
+        } else {
+          document.getElementById('guesserSliderControls').classList.remove('hidden');
+        }
+      } else if (state.phase === 'REVEAL') {
+        document.getElementById('clueDisplayArea').classList.remove('hidden');
+        document.getElementById('activeClueText').textContent = `"${state.clue}"`;
+        document.getElementById('revealControls').classList.remove('hidden');
+
+        const res = document.getElementById('pointsResult');
+        if (state.lastPoints === 4) res.textContent = '🎯 BULLSEYE! +4 Points (+1 Psychic Bonus)';
+        else if (state.lastPoints === 3) res.textContent = '🔥 So Close! +3 Points';
+        else if (state.lastPoints === 2) res.textContent = '👍 Not Bad! +2 Points';
+        else res.textContent = '😬 Missed the target! 0 Points';
+      }
+    });
+  </script>
+</body>
+</html>

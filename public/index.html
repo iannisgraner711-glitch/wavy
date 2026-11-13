@@ -40,10 +40,10 @@
       text-align: center;
     }
 
-    h1 { margin: 0 0 8px; font-size: 2rem; letter-spacing: -0.5px; }
+    h1 { margin: 0 0 8px; font-size: 2rem; }
     p.subtitle { color: var(--muted); margin-top: 0; margin-bottom: 24px; }
 
-    input {
+    input, select, textarea {
       width: 100%;
       padding: 12px 16px;
       border-radius: 10px;
@@ -54,7 +54,9 @@
       margin-bottom: 12px;
       outline: none;
     }
-    input:focus { border-color: var(--accent); }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+
+    label { display: block; text-align: left; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
 
     button {
       width: 100%;
@@ -105,7 +107,6 @@
       color: var(--accent);
     }
 
-    /* Spectrum Cards */
     .spectrum-bar {
       display: flex;
       justify-content: space-between;
@@ -123,7 +124,6 @@
     .left-side { background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; }
     .right-side { background: rgba(56, 189, 248, 0.18); border: 1px solid rgba(56, 189, 248, 0.4); color: #7dd3fc; }
 
-    /* SVG Dial */
     .dial-wrapper {
       position: relative;
       width: 100%;
@@ -166,14 +166,15 @@
     }
 
     .room-code-display {
-      font-size: 2.5rem;
+      font-size: 2rem;
       font-weight: 800;
-      letter-spacing: 6px;
+      letter-spacing: 4px;
       color: var(--accent);
       background: #0f172a;
-      padding: 16px;
+      padding: 14px;
       border-radius: 12px;
-      margin: 16px 0;
+      margin: 12px 0;
+      word-break: break-all;
     }
 
     .error-banner {
@@ -195,19 +196,43 @@
     <div id="lobbyView">
       <h1>🌊 Wavy</h1>
       <p class="subtitle">Read each other's minds across the spectrum.</p>
-      <input type="text" id="playerName" placeholder="Enter your name" maxlength="16" />
-      <button id="createBtn">Create New Room</button>
-      <div class="divider">or join a friend</div>
-      <input type="text" id="roomCodeInput" placeholder="4-Letter Room Code" maxlength="4" style="text-transform: uppercase;" />
+      
+      <div id="createSection">
+        <input type="text" id="playerName" placeholder="Your Name" maxlength="16" />
+        
+        <label>Points to Win</label>
+        <select id="winningScoreSelect">
+          <option value="10">10 Points (Quick Game)</option>
+          <option value="15" selected>15 Points (Standard)</option>
+          <option value="20">20 Points (Long Game)</option>
+        </select>
+
+        <label>Prompt Source</label>
+        <select id="promptModeSelect">
+          <option value="premade">Premade Spectrums</option>
+          <option value="custom">Custom Spectrums</option>
+        </select>
+
+        <div id="customPromptsBox" class="hidden" style="margin-bottom: 12px;">
+          <label>Custom Prompts (One pair per line, separated by a comma)</label>
+          <textarea id="customPromptsInput" rows="3" placeholder="Cats, Dogs&#10;Apple, Android"></textarea>
+        </div>
+
+        <button id="createBtn">Create Room & Host</button>
+        <div class="divider">or join friend's room</div>
+      </div>
+
+      <input type="text" id="roomCodeInput" placeholder="Enter 4-Letter Code or URL" style="text-transform: uppercase;" />
       <button id="joinBtn" class="secondary">Join Room</button>
     </div>
 
     <!-- WAITING ROOM VIEW -->
     <div id="waitingView" class="hidden">
       <h1>Waiting for Player 2...</h1>
-      <p class="subtitle">Share this room code with your friend:</p>
+      <p class="subtitle">Send this room link or code to your friend:</p>
       <div class="room-code-display" id="displayRoomCode">----</div>
-      <p style="color: var(--muted); font-size: 0.9rem;">The game will start automatically when they join.</p>
+      <button id="copyLinkBtn" class="secondary" style="margin-bottom: 12px;">Copy Room Link</button>
+      <p style="color: var(--muted); font-size: 0.9rem;">Game starts automatically when they join.</p>
     </div>
 
     <!-- GAME VIEW -->
@@ -228,17 +253,10 @@
       <!-- DIAL SVG -->
       <div class="dial-wrapper">
         <svg viewBox="0 0 400 220" id="dialSvg">
-          <!-- Base semi-circle -->
           <path d="M 20 200 A 180 180 0 0 1 380 200 Z" fill="#0f172a" stroke="#334155" stroke-width="3" />
-          
-          <!-- Target Zones Group (Hidden when Guesser is guessing) -->
           <g id="targetWedges"></g>
-
-          <!-- Cover Shield (Shown when Guesser is guessing) -->
           <path id="shieldCover" d="M 20 200 A 180 180 0 0 1 380 200 Z" fill="#1e293b" stroke="#475569" stroke-width="3" class="hidden" />
           <text id="shieldText" x="200" y="135" fill="#64748b" font-size="16" font-weight="bold" text-anchor="middle" class="hidden">TARGET HIDDEN</text>
-
-          <!-- Needle -->
           <g id="needleGroup" transform="rotate(0, 200, 200)">
             <line x1="200" y1="200" x2="200" y2="30" stroke="#ef4444" stroke-width="5" stroke-linecap="round" />
             <circle cx="200" cy="200" r="14" fill="#f8fafc" />
@@ -248,36 +266,36 @@
       </div>
 
       <!-- PHASE CONTROLS -->
-      <!-- 1. Psychic Clue Input -->
       <div id="psychicClueControls" class="hidden">
-        <p style="color: var(--muted); margin-bottom: 10px;">Give a 1–2 word clue that matches where the target is on the spectrum:</p>
+        <p style="color: var(--muted); margin-bottom: 10px;">Give a 1–2 word clue matching the target location:</p>
         <input type="text" id="clueInput" placeholder="Type your clue..." maxlength="40" />
         <button id="submitClueBtn">Lock In Clue</button>
       </div>
 
-      <!-- 2. Guesser Waiting for Clue -->
       <div id="guesserWaitClue" class="hidden">
         <p style="color: var(--muted); font-size: 1.1rem;">Psychic is thinking of a clue...</p>
       </div>
 
-      <!-- 3. Active Clue Display + Guesser Slider -->
       <div id="clueDisplayArea" class="hidden">
         <div class="clue-box" id="activeClueText">"Clue"</div>
-        
         <div id="guesserSliderControls" class="hidden">
           <input type="range" id="dialSlider" min="0" max="100" value="50" />
           <button id="lockGuessBtn">Lock In Guess</button>
         </div>
-
         <div id="psychicWaitGuess" class="hidden">
           <p style="color: var(--muted);">Watch your partner move the dial in real time!</p>
         </div>
       </div>
 
-      <!-- 4. Reveal & Next Round -->
       <div id="revealControls" class="hidden">
         <h2 id="pointsResult" style="margin: 8px 0; color: #4ade80;">+4 Points! Bullseye!</h2>
         <button id="nextRoundBtn">Next Round</button>
+      </div>
+
+      <!-- WINNER SCREEN -->
+      <div id="winnerControls" class="hidden">
+        <h2 id="winnerText" style="color: #fde047; font-size: 1.8rem; margin-bottom: 12px;">🏆 Player Won the Game!</h2>
+        <button onclick="location.reload()" class="secondary">Play Again</button>
       </div>
     </div>
   </div>
@@ -285,9 +303,6 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    let currentState = null;
-
-    // DOM Elements
     const errorBox = document.getElementById('errorBox');
     const lobbyView = document.getElementById('lobbyView');
     const waitingView = document.getElementById('waitingView');
@@ -304,45 +319,84 @@
       errorBox.classList.remove('hidden');
     }
 
-    // Lobby Events
+    // Toggle Custom Prompt box
+    document.getElementById('promptModeSelect').onchange = (e) => {
+      const customBox = document.getElementById('customPromptsBox');
+      if (e.target.value === 'custom') customBox.classList.remove('hidden');
+      else customBox.classList.add('hidden');
+    };
+
+    // Check if URL has a room code on load (e.g., /room/ABCD)
+    const pathParts = window.location.pathname.split('/');
+    if (pathParts.length >= 3 && pathParts[1] === 'room') {
+      const urlCode = pathParts[2].toUpperCase();
+      document.getElementById('createSection').classList.add('hidden');
+      document.getElementById('roomCodeInput').value = urlCode;
+    }
+
     document.getElementById('createBtn').onclick = () => {
-      const name = document.getElementById('playerName').value.trim() || 'Player 1';
-      socket.emit('createRoom', name);
+      const playerName = document.getElementById('playerName').value.trim() || 'Host';
+      const winningScore = document.getElementById('winningScoreSelect').value;
+      const promptMode = document.getElementById('promptModeSelect').value;
+      
+      let customSpectrums = [];
+      if (promptMode === 'custom') {
+        const rawText = document.getElementById('customPromptsInput').value;
+        customSpectrums = rawText.split('\n')
+          .map(line => line.split(',').map(s => s.trim()))
+          .filter(pair => pair.length === 2 && pair[0] && pair[1]);
+        
+        if (customSpectrums.length === 0) {
+          return showError('Please enter at least one valid custom spectrum pair separated by a comma.');
+        }
+      }
+
+      socket.emit('createRoom', { playerName, winningScore, promptMode, customSpectrums });
     };
 
     document.getElementById('joinBtn').onclick = () => {
-      const name = document.getElementById('playerName').value.trim() || 'Player 2';
-      const code = document.getElementById('roomCodeInput').value.trim();
-      if (!code) return showError('Please enter a 4-letter room code.');
+      const playerName = document.getElementById('playerName').value.trim() || 'Player 2';
+      let inputVal = document.getElementById('roomCodeInput').value.trim();
+      
+      // If user pasted a full URL
+      if (inputVal.includes('/room/')) {
+        const parts = inputVal.split('/room/');
+        inputVal = parts[parts.length - 1];
+      }
+
+      const code = inputVal.toUpperCase();
+      if (!code) return showError('Please enter a valid room code or link.');
+      
       socket.emit('joinRoom', { code, playerName: name });
     };
 
     socket.on('roomCreated', (code) => {
-      document.getElementById('displayRoomCode').textContent = code;
+      const roomUrl = `${window.location.origin}/room/${code}`;
+      window.history.pushState({}, '', `/room/${code}`);
+      document.getElementById('displayRoomCode').textContent = roomUrl;
+      
       lobbyView.classList.add('hidden');
       waitingView.classList.remove('hidden');
     });
 
+    document.getElementById('copyLinkBtn').onclick = () => {
+      const roomUrl = window.location.href;
+      navigator.clipboard.writeText(roomUrl);
+      alert('Room link copied to clipboard!');
+    };
+
     socket.on('errorMsg', (msg) => showError(msg));
 
-    // Geometry helper for SVG wedges (0 to 100 maps to -90deg to +90deg)
-    function valToAngle(val) {
-      return (val - 50) * 1.8; // -90 to +90
-    }
+    function valToAngle(val) { return (val - 50) * 1.8; }
 
     function createWedgePath(centerVal, widthVal) {
       const startVal = Math.max(0, centerVal - widthVal);
       const endVal = Math.min(100, centerVal + widthVal);
       const startRad = ((startVal / 100) * Math.PI) - Math.PI;
       const endRad = ((endVal / 100) * Math.PI) - Math.PI;
-
-      const r = 178;
-      const cx = 200, cy = 200;
-      const x1 = cx + r * Math.cos(startRad);
-      const y1 = cy + r * Math.sin(startRad);
-      const x2 = cx + r * Math.cos(endRad);
-      const y2 = cy + r * Math.sin(endRad);
-
+      const r = 178, cx = 200, cy = 200;
+      const x1 = cx + r * Math.cos(startRad), y1 = cy + r * Math.sin(startRad);
+      const x2 = cx + r * Math.cos(endRad), y2 = cy + r * Math.sin(endRad);
       return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`;
     }
 
@@ -353,10 +407,8 @@
         shieldText.classList.remove('hidden');
         return;
       }
-
       shieldCover.classList.add('hidden');
       shieldText.classList.add('hidden');
-
       targetWedges.innerHTML = `
         <path d="${createWedgePath(targetVal, 16)}" fill="#10b981" opacity="0.85" />
         <path d="${createWedgePath(targetVal, 10)}" fill="#f59e0b" opacity="0.95" />
@@ -365,22 +417,17 @@
     }
 
     function setNeedle(val) {
-      const deg = valToAngle(val);
-      needleGroup.setAttribute('transform', `rotate(${deg}, 200, 200)`);
+      needleGroup.setAttribute('transform', `rotate(${valToAngle(val)}, 200, 200)`);
     }
 
-    // Dial Slider Movement
     dialSlider.oninput = (e) => {
       const val = e.target.value;
       setNeedle(val);
       socket.emit('updateDial', val);
     };
 
-    socket.on('dialMoved', (val) => {
-      setNeedle(val);
-    });
+    socket.on('dialMoved', (val) => setNeedle(val));
 
-    // Game Actions
     document.getElementById('submitClueBtn').onclick = () => {
       const clue = document.getElementById('clueInput').value.trim();
       if (!clue) return;
@@ -388,17 +435,10 @@
       document.getElementById('clueInput').value = '';
     };
 
-    document.getElementById('lockGuessBtn').onclick = () => {
-      socket.emit('lockGuess', dialSlider.value);
-    };
+    document.getElementById('lockGuessBtn').onclick = () => socket.emit('lockGuess', dialSlider.value);
+    document.getElementById('nextRoundBtn').onclick = () => socket.emit('nextRound');
 
-    document.getElementById('nextRoundBtn').onclick = () => {
-      socket.emit('nextRound');
-    };
-
-    // Main State Sync
     socket.on('gameState', (state) => {
-      currentState = state;
       if (state.phase === 'WAITING') return;
 
       errorBox.classList.add('hidden');
@@ -406,40 +446,37 @@
       waitingView.classList.add('hidden');
       gameView.classList.remove('hidden');
 
-      // Scoreboard & Labels
       document.getElementById('p1Score').textContent = `${state.players[0].name}: ${state.players[0].score}`;
       document.getElementById('p2Score').textContent = `${state.players[1].name}: ${state.players[1].score}`;
-      document.getElementById('roundDisplay').textContent = `Round ${state.round}`;
+      document.getElementById('roundDisplay').textContent = `Round ${state.round} (Target: ${state.winningScore} pts)`;
       document.getElementById('leftLabel').textContent = state.spectrum[0];
       document.getElementById('rightLabel').textContent = state.spectrum[1];
 
       const roleBadge = document.getElementById('roleBadge');
       roleBadge.textContent = state.isPsychic ? '🔮 You are the Psychic' : '🎯 You are the Guesser';
 
-      // Target & Needle
       renderTarget(state.target);
       setNeedle(state.guess);
       dialSlider.value = state.guess;
 
-      // Reset Phase Panels
-      ['psychicClueControls', 'guesserWaitClue', 'clueDisplayArea', 'guesserSliderControls', 'psychicWaitGuess', 'revealControls']
+      ['psychicClueControls', 'guesserWaitClue', 'clueDisplayArea', 'guesserSliderControls', 'psychicWaitGuess', 'revealControls', 'winnerControls']
         .forEach(id => document.getElementById(id).classList.add('hidden'));
 
+      if (state.winner) {
+        document.getElementById('clueDisplayArea').classList.remove('hidden');
+        document.getElementById('winnerControls').classList.remove('hidden');
+        document.getElementById('winnerText').textContent = `🏆 ${state.winner} won the game!`;
+        return;
+      }
+
       if (state.phase === 'CLUE') {
-        if (state.isPsychic) {
-          document.getElementById('psychicClueControls').classList.remove('hidden');
-        } else {
-          document.getElementById('guesserWaitClue').classList.remove('hidden');
-        }
+        if (state.isPsychic) document.getElementById('psychicClueControls').classList.remove('hidden');
+        else document.getElementById('guesserWaitClue').classList.remove('hidden');
       } else if (state.phase === 'GUESS') {
         document.getElementById('clueDisplayArea').classList.remove('hidden');
         document.getElementById('activeClueText').textContent = `"${state.clue}"`;
-
-        if (state.isPsychic) {
-          document.getElementById('psychicWaitGuess').classList.remove('hidden');
-        } else {
-          document.getElementById('guesserSliderControls').classList.remove('hidden');
-        }
+        if (state.isPsychic) document.getElementById('psychicWaitGuess').classList.remove('hidden');
+        else document.getElementById('guesserSliderControls').classList.remove('hidden');
       } else if (state.phase === 'REVEAL') {
         document.getElementById('clueDisplayArea').classList.remove('hidden');
         document.getElementById('activeClueText').textContent = `"${state.clue}"`;

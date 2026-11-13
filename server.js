@@ -9,7 +9,12 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const SPECTRUMS = [
+// Serve index.html for all room routes so client-side router handles it
+app.get('/room/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+const PREMADE_SPECTRUMS = [
   ["Cold", "Hot"],
   ["Overrated", "Underrated"],
   ["Terrible Movie", "Masterpiece"],
@@ -21,10 +26,7 @@ const SPECTRUMS = [
   ["Snack", "Full Meal"],
   ["Mainstream", "Niche"],
   ["Harmless", "Deadly"],
-  ["Ancient", "Futuristic"],
-  ["Boring Hobby", "Thrilling Hobby"],
-  ["Cheap", "Expensive"],
-  ["Villain", "Hero"]
+  ["Ancient", "Futuristic"]
 ];
 
 const rooms = {};
@@ -38,25 +40,33 @@ function generateRoomCode() {
   return rooms[code] ? generateRoomCode() : code;
 }
 
-function getRandomSpectrum(usedIndices = []) {
-  if (usedIndices.length >= SPECTRUMS.length) usedIndices.length = 0;
-  let idx;
-  do {
-    idx = Math.floor(Math.random() * SPECTRUMS.length);
-  } while (usedIndices.includes(idx));
-  usedIndices.push(idx);
-  return SPECTRUMS[idx];
+function getNextSpectrum(room) {
+  if (room.promptMode === 'custom' && room.customSpectrums.length > 0) {
+    // Pick randomly from custom list
+    const idx = Math.floor(Math.random() * room.customSpectrums.length);
+    return room.customSpectrums[idx];
+  } else {
+    // Premade list
+    if (room.usedPremadeIndices.length >= PREMADE_SPECTRUMS.length) {
+      room.usedPremadeIndices = [];
+    }
+    let idx;
+    do {
+      idx = Math.floor(Math.random() * PREMADE_SPECTRUMS.length);
+    } while (room.usedPremadeIndices.includes(idx));
+    room.usedPremadeIndices.push(idx);
+    return PREMADE_SPECTRUMS[idx];
+  }
 }
 
 function startNewRound(room) {
   room.round += 1;
-  // Swap psychic between player 0 and player 1
   room.psychicIndex = room.round % 2 === 1 ? 0 : 1;
-  room.target = Math.floor(Math.random() * 81) + 10; // Keep target between 10 and 90
-  room.spectrum = getRandomSpectrum(room.usedSpectrums);
+  room.target = Math.floor(Math.random() * 81) + 10;
+  room.spectrum = getNextSpectrum(room);
   room.clue = '';
   room.guess = 50;
-  room.phase = 'CLUE'; // CLUE -> GUESS -> REVEAL
+  room.phase = 'CLUE';
   room.lastPoints = 0;
 }
 
@@ -66,7 +76,6 @@ function emitRoomState(roomCode) {
 
   room.players.forEach((player, index) => {
     const isPsychic = index === room.psychicIndex;
-    // Hide the target from the Guesser until the REVEAL phase
     const visibleTarget = (isPsychic || room.phase === 'REVEAL') ? room.target : null;
 
     io.to(player.id).emit('gameState', {
@@ -80,25 +89,31 @@ function emitRoomState(roomCode) {
       target: visibleTarget,
       clue: room.clue,
       guess: room.guess,
-      lastPoints: room.lastPoints
+      lastPoints: room.lastPoints,
+      winningScore: room.winningScore,
+      winner: room.winner
     });
   });
 }
 
 io.on('connection', (socket) => {
-  socket.on('createRoom', (playerName) => {
+  socket.on('createRoom', ({ playerName, winningScore, promptMode, customSpectrums }) => {
     const code = generateRoomCode();
     rooms[code] = {
       players: [{ id: socket.id, name: playerName || 'Player 1', score: 0 }],
       round: 0,
+      winningScore: Number(winningScore) || 10,
+      promptMode: promptMode || 'premade',
+      customSpectrums: customSpectrums || [],
+      usedPremadeIndices: [],
       psychicIndex: 0,
       target: 50,
-      spectrum: SPECTRUMS[0],
-      usedSpectrums: [],
+      spectrum: ["Cold", "Hot"],
       clue: '',
       guess: 50,
       phase: 'WAITING',
-      lastPoints: 0
+      lastPoints: 0,
+      winner: null
     };
     socket.join(code);
     socket.roomCode = code;
@@ -110,12 +125,8 @@ io.on('connection', (socket) => {
     const roomCode = (code || '').toUpperCase().trim();
     const room = rooms[roomCode];
 
-    if (!room) {
-      return socket.emit('errorMsg', 'Room not found.');
-    }
-    if (room.players.length >= 2) {
-      return socket.emit('errorMsg', 'Room is already full (2 players max).');
-    }
+    if (!room) return socket.emit('errorMsg', 'Room not found.');
+    if (room.players.length >= 2) return socket.emit('errorMsg', 'Room is already full.');
 
     room.players.push({ id: socket.id, name: playerName || 'Player 2', score: 0 });
     socket.join(roomCode);
@@ -138,7 +149,6 @@ io.on('connection', (socket) => {
   socket.on('updateDial', (value) => {
     const room = rooms[socket.roomCode];
     if (!room || room.phase !== 'GUESS') return;
-    // Broadcast live dial movement to the Psychic so they can watch!
     room.guess = Number(value);
     socket.to(socket.roomCode).emit('dialMoved', room.guess);
   });
@@ -157,11 +167,16 @@ io.on('connection', (socket) => {
     else if (diff <= 16) points = 2;
 
     room.lastPoints = points;
-    // Both players share team score or individual score; here we award both for co-op or the guesser for competitive.
-    // Let's award points to the team/both or active guesser. Let's make it competitive: Guesser & Psychic both get points, or Guesser gets points!
     const guesserIndex = room.psychicIndex === 0 ? 1 : 0;
     room.players[guesserIndex].score += points;
-    if (points === 4) room.players[room.psychicIndex].score += 1; // Bonus point for Psychic on bullseye!
+    if (points === 4) room.players[room.psychicIndex].score += 1;
+
+    // Check win condition
+    if (room.players[guesserIndex].score >= room.winningScore) {
+      room.winner = room.players[guesserIndex].name;
+    } else if (room.players[room.psychicIndex].score >= room.winningScore) {
+      room.winner = room.players[room.psychicIndex].name;
+    }
 
     room.phase = 'REVEAL';
     emitRoomState(socket.roomCode);
@@ -170,6 +185,10 @@ io.on('connection', (socket) => {
   socket.on('nextRound', () => {
     const room = rooms[socket.roomCode];
     if (!room || room.phase !== 'REVEAL') return;
+    if (room.winner) {
+      // Reset game if wanted, or stay
+      return;
+    }
     startNewRound(room);
     emitRoomState(socket.roomCode);
   });
@@ -177,7 +196,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const code = socket.roomCode;
     if (code && rooms[code]) {
-      io.to(code).emit('errorMsg', 'The other player disconnected. Refresh to start a new game.');
+      io.to(code).emit('errorMsg', 'The other player disconnected.');
       delete rooms[code];
     }
   });
